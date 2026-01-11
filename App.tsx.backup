@@ -1,0 +1,125 @@
+import React, { useState, useEffect } from 'react';
+import { BudgetSetup } from './components/BudgetSetup';
+import { Dashboard } from './components/Dashboard';
+import { TransactionInput } from './components/TransactionInput';
+import { TransactionList } from './components/TransactionList';
+import { BudgetState, Transaction, ParsedExpense, TransactionCategory } from './types';
+import { loadBudget, saveBudget, loadTransactions, saveTransactions } from './utils/storage';
+
+const App: React.FC = () => {
+  const [budget, setBudget] = useState<BudgetState>(loadBudget());
+  const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions());
+  const [view, setView] = useState<'dashboard' | 'history'>('dashboard');
+  const [filter, setFilter] = useState<TransactionCategory | 'All'>('All');
+
+  // Persist state changes
+  useEffect(() => {
+    saveBudget(budget);
+  }, [budget]);
+
+  useEffect(() => {
+    saveTransactions(transactions);
+  }, [transactions]);
+
+  const handleBudgetComplete = (newBudget: BudgetState) => {
+    setBudget(newBudget);
+  };
+
+  const handleAddTransaction = (parsed: ParsedExpense) => {
+    if (!parsed.amount || !parsed.category) return;
+
+    const newTransaction: Transaction = {
+      id: Date.now().toString(),
+      amount: parsed.amount,
+      category: parsed.category,
+      description: parsed.description,
+      date: parsed.date.toISOString(),
+      timestamp: Date.now(),
+    };
+
+    setTransactions(prev => [newTransaction, ...prev]);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    setTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(t => 
+    filter === 'All' ? true : t.category === filter
+  );
+
+  // If budget not set, show setup
+  if (!budget.isSet) {
+    return <BudgetSetup onComplete={handleBudgetComplete} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white pb-32">
+      {/* Background Ambience */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+         <div className="absolute top-[-20%] left-[-20%] w-[50%] h-[50%] bg-violet-900/10 rounded-full blur-[120px]" />
+         <div className="absolute top-[20%] right-[-20%] w-[50%] h-[50%] bg-emerald-900/10 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 pt-6 relative z-10">
+        
+        {/* Navigation Tabs */}
+        <div className="flex gap-4 mb-6 sticky top-24 z-30">
+            <button 
+                onClick={() => setView('dashboard')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${view === 'dashboard' ? 'bg-white text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+            >
+                Dashboard
+            </button>
+            <button 
+                onClick={() => setView('history')}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${view === 'history' ? 'bg-white text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+            >
+                History
+            </button>
+        </div>
+
+        {view === 'dashboard' ? (
+          <>
+            <Dashboard budget={budget} transactions={transactions} />
+            <div className="mt-8">
+                <h3 className="text-xl font-bold mb-4">Recent Activity</h3>
+                <TransactionList 
+                    transactions={transactions.slice(0, 5)} 
+                    onDelete={handleDeleteTransaction} 
+                />
+            </div>
+          </>
+        ) : (
+          <div className="animate-fade-in">
+             <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Transaction History</h2>
+                <select 
+                    value={filter} 
+                    onChange={(e) => setFilter(e.target.value as TransactionCategory | 'All')}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                    <option value="All">All Categories</option>
+                    <option value="Food">Food</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Bills">Bills</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Other">Other</option>
+                </select>
+             </div>
+             <TransactionList 
+                transactions={filteredTransactions} 
+                onDelete={handleDeleteTransaction} 
+             />
+          </div>
+        )}
+      </div>
+
+      <TransactionInput onAddTransaction={handleAddTransaction} />
+    </div>
+  );
+};
+
+export default App;
