@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Transaction } from '../types';
 import { generateAnalytics } from '../utils/analytics';
 import { Card } from './ui/Card';
@@ -14,6 +14,11 @@ export const SpendingsSummary: React.FC<SpendingsSummaryProps> = ({ transactions
         () => generateAnalytics(transactions),
         [transactions]
     );
+
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const categoryTransactions = selectedCategory
+        ? transactions.filter(t => t.category === selectedCategory)
+        : [];
 
     const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e'];
 
@@ -100,8 +105,13 @@ export const SpendingsSummary: React.FC<SpendingsSummaryProps> = ({ transactions
                 {/* Detailed List */}
                 <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-white">Category Details</h3>
+                    <p className="text-xs text-gray-500">Click a category to see all transactions</p>
                     {breakdown.map((item, index) => (
-                        <div key={item.name} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                        <div 
+                            key={item.name} 
+                            className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                            onClick={() => setSelectedCategory(item.name)}
+                        >
                             <div className="flex items-center gap-3">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                                 <div>
@@ -109,9 +119,12 @@ export const SpendingsSummary: React.FC<SpendingsSummaryProps> = ({ transactions
                                     <p className="text-xs text-gray-500">{item.count} transactions</p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-sm font-mono font-bold text-gray-200">₹{item.amount.toLocaleString()}</p>
-                                <p className="text-xs text-gray-500">{item.percentage}%</p>
+                            <div className="text-right flex items-center gap-3">
+                                <div>
+                                    <p className="text-sm font-mono font-bold text-gray-200">₹{item.amount.toLocaleString()}</p>
+                                    <p className="text-xs text-gray-500">{item.percentage}%</p>
+                                </div>
+                                <span className="text-gray-500 text-xs">▶</span>
                             </div>
                         </div>
                     ))}
@@ -136,6 +149,42 @@ export const SpendingsSummary: React.FC<SpendingsSummaryProps> = ({ transactions
                                 </p>
                             </Card>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Category Drill-Down Modal */}
+            {selectedCategory && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedCategory(null)}>
+                    <div className="bg-[#1a1b26] border border-white/10 rounded-2xl w-full max-w-lg max-h-[70vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-5 border-b border-white/10">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">{selectedCategory}</h3>
+                                <p className="text-xs text-gray-400">{categoryTransactions.length} transactions • ₹{categoryTransactions.reduce((s, t) => s + t.amount, 0).toLocaleString()}</p>
+                            </div>
+                            <button onClick={() => setSelectedCategory(null)} className="p-2 text-gray-400 hover:text-white transition-colors hover:bg-white/10 rounded-lg">
+                                ✕
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto max-h-[55vh] p-4 space-y-2">
+                            {categoryTransactions.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No transactions in this category</p>
+                            ) : (
+                                categoryTransactions.map(t => (
+                                    <div key={t.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                                        <div>
+                                            <p className="text-sm font-medium text-white">{t.description}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(t.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                {' • '}
+                                                {new Date(t.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        <span className="font-mono font-bold text-white">₹{t.amount.toLocaleString()}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

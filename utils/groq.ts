@@ -13,16 +13,18 @@ export async function parseExpenseWithAI(input: string): Promise<ParsedExpense[]
     }
 
     const prompt = `
-    You are an intelligent expense parser. Extract one or more expenses from the user's input.
+    You are an intelligent expense and income parser. Extract one or more items from the user's input.
     Input: "${input}"
 
     Return ONLY a JSON object with a single key "expenses" which is an array of objects.
     Each object in the array should have:
     - "amount" (number, required)
-    - "category" (one of: Groceries, Outings, BodyCare [e.g. shampoo, salon, gym, meds], Orders, Petrol, Miscellaneous, Bills, Savings, Other)
+    - "category" (one of: Groceries, Outings, BodyCare [e.g. shampoo, salon, gym, meds], Orders, Petrol, Miscellaneous, Bills, Savings, Income, Other)
     - "description" (short summary)
     - "date" (ISO string, assume today is ${new Date().toISOString()} if not specified)
+    - "isIncome" (boolean, true if this is money being ADDED/RECEIVED, e.g. input starts with + sign like "+100" or "+500 salary")
 
+    If the input starts with a + sign, it means the user is ADDING money (income). Set isIncome to true and category to "Income".
     If amount is missing for an item, skip it.
     If category is unclear, use "Miscellaneous".
   `;
@@ -60,18 +62,21 @@ export async function parseExpenseWithAI(input: string): Promise<ParsedExpense[]
             'Miscellaneous': 'Miscellaneous', 'Misc': 'Miscellaneous',
             'Bills': 'Bills',
             'Savings': 'Savings',
+            'Income': 'Income', 'Salary': 'Income', 'Received': 'Income',
             'Other': 'Other'
         };
 
         return expenses.map((item: any) => {
             const rawCat = item.category || 'Miscellaneous';
             const normalizedCat = CATEGORY_MAP[rawCat] || CATEGORY_MAP[rawCat.replace(/\s+/g, '')] || 'Miscellaneous';
+            const isItemIncome = item.isIncome === true || normalizedCat === 'Income';
 
             return {
                 amount: item.amount,
-                category: normalizedCat,
+                category: isItemIncome ? 'Income' as TransactionCategory : normalizedCat,
                 description: item.description || input,
-                date: item.date ? new Date(item.date) : new Date()
+                date: item.date ? new Date(item.date) : new Date(),
+                isIncome: isItemIncome
             };
         }).filter((e: ParsedExpense) => e.amount !== null);
 

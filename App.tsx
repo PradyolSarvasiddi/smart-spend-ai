@@ -18,7 +18,7 @@ const AuthenticatedApp: React.FC = () => {
   const { user, logout } = useAuth();
   const [budget, setBudget] = useState<BudgetState | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [view, setView] = useState<'dashboard' | 'history' | 'summary' | 'weekly'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'history' | 'summary' | 'weekly' | 'all-transactions'>('dashboard');
   const [filter, setFilter] = useState<TransactionCategory | 'All'>('All');
   const [loadingData, setLoadingData] = useState(true);
 
@@ -65,13 +65,15 @@ const AuthenticatedApp: React.FC = () => {
 
   const handleAddTransaction = async (parsed: ParsedExpense) => {
     if (!parsed.amount || !parsed.category || !user?.id) return;
+    const isIncome = parsed.isIncome === true || parsed.category === 'Income';
     const newTransaction: Transaction = {
       id: Date.now().toString(),
       amount: parsed.amount,
-      category: parsed.category,
+      category: isIncome ? 'Income' : parsed.category,
       description: parsed.description,
       date: parsed.date.toISOString(),
       timestamp: Date.now(),
+      type: isIncome ? 'income' : 'expense',
     };
 
     // Add to Cloud (Optimistic UI: update local first, or wait? Let's add then update)
@@ -192,6 +194,12 @@ const AuthenticatedApp: React.FC = () => {
             Dashboard
           </button>
           <button
+            onClick={() => setView('all-transactions')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${view === 'all-transactions' ? 'bg-white text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+          >
+            All Transactions
+          </button>
+          <button
             onClick={() => setView('history')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${view === 'history' ? 'bg-white text-black' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
           >
@@ -223,21 +231,25 @@ const AuthenticatedApp: React.FC = () => {
               />
             </div>
           </>
-        ) : (
-          <div className="min-h-screen">
+        ) : view === 'all-transactions' ? (
+          <div className="min-h-screen pb-32">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold">Transaction History</h3>
+              <h3 className="text-xl font-bold">All Transactions</h3>
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as TransactionCategory | 'All')}
                 className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
                 <option value="All">All Categories</option>
-                <option value="Food">Food</option>
-                <option value="Shopping">Shopping</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Outings">Outings</option>
+                <option value="BodyCare">Body Care</option>
+                <option value="Orders">Orders</option>
+                <option value="Petrol">Petrol</option>
+                <option value="Miscellaneous">Miscellaneous</option>
                 <option value="Bills">Bills</option>
-                <option value="Transport">Transport</option>
-                <option value="Entertainment">Entertainment</option>
+                <option value="Savings">Savings</option>
+                <option value="Income">Income</option>
                 <option value="Other">Other</option>
               </select>
             </div>
@@ -246,7 +258,7 @@ const AuthenticatedApp: React.FC = () => {
               onDelete={handleDeleteTransaction}
             />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

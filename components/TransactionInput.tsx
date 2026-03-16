@@ -73,23 +73,23 @@ export const TransactionInput: React.FC<TransactionInputProps> = ({ onAddTransac
             <div className="bg-[#1a1b26]/90 backdrop-blur-md border border-emerald-500/30 text-white p-4 rounded-xl shadow-lg">
               <div className="flex justify-between items-center mb-2 border-b border-white/10 pb-2">
                 <span className="text-xs text-emerald-400 font-medium tracking-wide">DETECTED {preview.length} ITEMS</span>
-                <span className="text-xs text-gray-400">Total: ₹{preview.reduce((sum, item) => sum + (item.amount || 0), 0).toLocaleString()}</span>
+                <span className="text-xs text-gray-400">Total: ₹{preview.reduce((sum, item) => sum + (item.amount || 0) * (item.isIncome ? 1 : 1), 0).toLocaleString()}</span>
               </div>
               <div className="space-y-3">
                 {preview.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-lg">
-                        {getCategoryEmoji(item.category || 'Other')}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-lg ${item.isIncome ? 'bg-green-500/20' : 'bg-emerald-500/20'}`}>
+                        {item.isIncome ? '💰' : getCategoryEmoji(item.category || 'Other')}
                       </div>
                       <div>
-                        <p className="font-medium text-sm text-emerald-300">
+                        <p className={`font-medium text-sm ${item.isIncome ? 'text-green-300' : 'text-emerald-300'}`}>
                           {item.description}
                         </p>
-                        <p className="text-xs text-gray-500">{item.category}</p>
+                        <p className="text-xs text-gray-500">{item.isIncome ? 'Income' : item.category}</p>
                       </div>
                     </div>
-                    <span className="font-mono font-bold text-white">₹{item.amount?.toLocaleString()}</span>
+                    <span className={`font-mono font-bold ${item.isIncome ? 'text-green-400' : 'text-white'}`}>{item.isIncome ? '+' : ''}₹{item.amount?.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -110,7 +110,7 @@ export const TransactionInput: React.FC<TransactionInputProps> = ({ onAddTransac
               onFocus={() => setIsFocused(true)}
               onBlur={() => setTimeout(() => setIsFocused(false), 200)}
               onKeyDown={handleKeyDown}
-              placeholder="Type naturally... 'Spent 200 on burgers, 500 on taxi'"
+              placeholder="Type expenses or add money... e.g. '200 groceries' or '+500 salary'"
               className="w-full bg-transparent border-none text-white placeholder-gray-500 text-lg p-3 resize-none focus:ring-0 max-h-24 font-medium"
               rows={1}
               style={{ minHeight: '3rem' }}

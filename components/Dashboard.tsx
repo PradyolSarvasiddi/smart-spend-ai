@@ -15,6 +15,15 @@ interface DashboardProps {
     onViewWeekly: () => void;
 }
 
+const getCategoryEmoji = (category: string): string => {
+    const map: Record<string, string> = {
+        Groceries: '🥦', Outings: '🎉', BodyCare: '🧴', Orders: '📦',
+        Petrol: '⛽', Miscellaneous: '🧩', Bills: '⚡', Savings: '🏦',
+        Income: '💰', Other: '📝'
+    };
+    return map[category] || '📝';
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUpdateBudget, onResetBudget, onViewSummary, onViewWeekly }) => {
     // Local state for inline editing
     const [editing, setEditing] = useState<'Weekly' | 'Monthly' | 'Savings' | null>(null);
@@ -23,6 +32,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
     // Alert System
     const [activeAlerts, setActiveAlerts] = useState<AlertItem[]>([]);
     const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     useEffect(() => {
         const generated = generateAlerts(budget, transactions);
@@ -39,17 +49,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
         });
     };
 
-    // Calculate totals
-    const totalSpent = transactions.reduce((acc, t) => acc + t.amount, 0);
-    const remainingTotal = budget.monthlyIncome - totalSpent;
+    // Calculate totals (exclude income from spending)
+    const expenseTransactions = transactions.filter(t => t.type !== 'income' && t.category !== 'Income');
+    const incomeTransactions = transactions.filter(t => t.type === 'income' || t.category === 'Income');
+    const totalSpent = expenseTransactions.reduce((acc, t) => acc + t.amount, 0);
+    const totalExtraIncome = incomeTransactions.reduce((acc, t) => acc + t.amount, 0);
+    const remainingTotal = budget.monthlyIncome + totalExtraIncome - totalSpent;
 
     // Calculate Weekly Spending Logic
-    const weeklySpent = transactions
+    const weeklySpent = expenseTransactions
         .filter(t => isSameWeek(new Date(t.date), new Date()) && CATEGORY_BUCKET_MAP[t.category] === 'Weekly')
         .reduce((sum, t) => sum + t.amount, 0);
 
     // Calculate Monthly Bucket Spending
-    const monthlyBucketSpent = transactions
+    const monthlyBucketSpent = expenseTransactions
         .filter(t => CATEGORY_BUCKET_MAP[t.category] === 'Monthly')
         .reduce((sum, t) => sum + t.amount, 0);
 
@@ -103,7 +116,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
 
     // Pie Chart Data
     const pieData = useMemo(() => {
-        const catMap = transactions.reduce((acc, t) => {
+        const catMap = expenseTransactions.reduce((acc, t) => {
             acc[t.category] = (acc[t.category] || 0) + t.amount;
             return acc;
         }, {} as Record<string, number>);
@@ -112,7 +125,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
             name: key,
             value: catMap[key]
         }));
-    }, [transactions]);
+    }, [expenseTransactions]);
+
+    // Get transactions for selected category drill-down
+    const categoryTransactions = selectedCategory 
+        ? transactions.filter(t => t.category === selectedCategory)
+        : [];
 
     const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#3b82f6', '#ec4899', '#6366f1'];
 
@@ -136,6 +154,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
                             ₹{remainingTotal.toLocaleString()}
                             <span className="text-sm text-gray-500 font-sans font-normal ml-2">/ ₹{budget.monthlyIncome.toLocaleString()}</span>
                         </div>
+                        {totalExtraIncome > 0 && (
+                            <p className="text-xs text-emerald-400 mt-1">+₹{totalExtraIncome.toLocaleString()} added</p>
+                        )}
                     </div>
 
                     {/* Actions */}
@@ -320,7 +341,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
                             </ResponsiveContainer>
                             <div className="flex flex-wrap gap-2 justify-center mt-4">
                                 {pieData.map((entry, index) => (
-                                    <div key={entry.name} className="flex items-center gap-1 text-xs text-gray-400">
+                                    <div 
+                                        key={entry.name} 
+                                        className="flex items-center gap-1 text-xs text-gray-400 cursor-pointer hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
+                                        onClick={() => setSelectedCategory(entry.name)}
+                                    >
                                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                                         {entry.name}
                                     </div>
@@ -334,6 +359,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ budget, transactions, onUp
                     )}
                 </Card>
             </div>
+
+            {/* Category Drill-Down Modal */}
+            {selectedCategory && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedCategory(null)}>
+                    <div className="bg-[#1a1b26] border border-white/10 rounded-2xl w-full max-w-lg max-h-[70vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-5 border-b border-white/10">
+                            <div className="flex items-center gap-3">
+                                <span className="text-2xl">{getCategoryEmoji(selectedCategory)}</span>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">{selectedCategory}</h3>
+                                    <p className="text-xs text-gray-400">{categoryTransactions.length} transactions • ₹{categoryTransactions.reduce((s, t) => s + t.amount, 0).toLocaleString()}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedCategory(null)} className="p-2 text-gray-400 hover:text-white transition-colors hover:bg-white/10 rounded-lg">
+                                ✕
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto max-h-[55vh] p-4 space-y-2">
+                            {categoryTransactions.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">No transactions in this category</p>
+                            ) : (
+                                categoryTransactions.map(t => (
+                                    <div key={t.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                                        <div>
+                                            <p className="text-sm font-medium text-white">{t.description}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(t.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                {' • '}
+                                                {new Date(t.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        <span className="font-mono font-bold text-white">₹{t.amount.toLocaleString()}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

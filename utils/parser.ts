@@ -2,11 +2,17 @@ import { TransactionCategory, ParsedExpense } from '../types';
 
 export const parseExpenseInput = (text: string): ParsedExpense => {
   const lowerText = text.toLowerCase();
+  const trimmedText = text.trim();
+
+  // 0. Detect Income (+ prefix)
+  const isIncome = /^\+/.test(trimmedText);
+  const cleanedText = isIncome ? trimmedText.replace(/^\+\s*/, '') : trimmedText;
+  const cleanedLower = cleanedText.toLowerCase();
 
   // 1. Extract Amount
   // Matches "200", "200.50", "₹200", "rs 200"
   const amountRegex = /(?:rs\.?|₹)?\s*(\d+(?:,\d+)*(?:\.\d{1,2})?)\b/i;
-  const amountMatch = lowerText.match(amountRegex);
+  const amountMatch = cleanedLower.match(amountRegex);
   let amount: number | null = null;
 
   if (amountMatch) {
@@ -14,10 +20,35 @@ export const parseExpenseInput = (text: string): ParsedExpense => {
     amount = parseFloat(amountMatch[1].replace(/,/g, ''));
   }
 
+  // If income, set category to Income and skip keyword matching
+  if (isIncome && amount) {
+    let description = cleanedText;
+    if (amountMatch) {
+      description = description.replace(amountMatch[0], '').trim();
+    }
+    if (description.length === 0) {
+      description = 'Money Added';
+    }
+
+    // 3. Extract Date (Simple logic)
+    let date = new Date();
+    if (cleanedLower.includes('yesterday')) {
+      date.setDate(date.getDate() - 1);
+    }
+
+    return {
+      amount,
+      category: 'Income',
+      description: description.charAt(0).toUpperCase() + description.slice(1),
+      date,
+      isIncome: true
+    };
+  }
+
   // 2. Extract Category
   let category: TransactionCategory | null = null;
 
-  const keywords: Record<TransactionCategory, string[]> = {
+  const keywords: Record<string, string[]> = {
     Groceries: ['groceries', 'grocery', 'vegetables', 'fruits', 'milk', 'bread', 'market', 'supermarket', 'food', 'ration'],
     Outings: ['outings', 'outing', 'restaurant', 'cafe', 'coffee', 'tea', 'dinner', 'lunch', 'breakfast', 'movie', 'cinema', 'concert', 'uber', 'ola', 'cab', 'taxi', 'hotel', 'trip', 'party', 'fun'],
     BodyCare: ['body care', 'bodycare', 'personal care', 'salon', 'spa', 'haircut', 'gym', 'medicine', 'pharmacy', 'doctor', 'hospital', 'cream', 'soap', 'shampoo', 'conditioner', 'lotion', 'face wash', 'skincare', 'makeup', 'cosmetics', 'medical', 'health', 'toothbrush', 'paste'],
@@ -26,7 +57,6 @@ export const parseExpenseInput = (text: string): ParsedExpense => {
     Miscellaneous: ['miscellaneous', 'misc', 'gift', 'donation', 'other', 'random'],
     Bills: ['bills', 'bill', 'electricity', 'rent', 'wifi', 'internet', 'recharge', 'subscription', 'mobile', 'water', 'fee', 'utility'],
     Savings: ['save', 'savings', 'invest', 'mutual fund', 'sip', 'deposit'],
-    Other: []
   };
 
   for (const [cat, words] of Object.entries(keywords)) {
@@ -70,7 +100,8 @@ export const parseExpenseInput = (text: string): ParsedExpense => {
     amount,
     category,
     description: description.charAt(0).toUpperCase() + description.slice(1),
-    date
+    date,
+    isIncome: false
   };
 };
 

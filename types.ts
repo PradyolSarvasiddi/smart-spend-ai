@@ -1,4 +1,4 @@
-export type TransactionCategory = 'Groceries' | 'Outings' | 'BodyCare' | 'Orders' | 'Miscellaneous' | 'Petrol' | 'Bills' | 'Savings' | 'Other';
+export type TransactionCategory = 'Groceries' | 'Outings' | 'BodyCare' | 'Orders' | 'Miscellaneous' | 'Petrol' | 'Bills' | 'Savings' | 'Income' | 'Other';
 
 export interface Transaction {
   id: string;
@@ -7,6 +7,7 @@ export interface Transaction {
   description: string;
   date: string; // ISO string
   timestamp: number;
+  type: 'income' | 'expense';
 }
 
 export interface BudgetAllocations {
@@ -27,6 +28,7 @@ export interface ParsedExpense {
   category: TransactionCategory | null;
   description: string;
   date: Date;
+  isIncome?: boolean;
 }
 
 // Mapping specific transaction categories to high-level budget buckets
@@ -42,6 +44,7 @@ export const CATEGORY_BUCKET_MAP: Record<TransactionCategory, BudgetBucket> = {
   Other: 'Weekly',
   Bills: 'Monthly',
   Savings: 'Savings',
+  Income: 'Monthly', // Income doesn't really belong to a budget bucket, but needs a default
 };
 
 // --- History Types ---
